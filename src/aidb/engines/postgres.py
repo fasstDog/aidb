@@ -18,7 +18,12 @@ class PostgresAdapter(EngineAdapter):
     id = "postgres"
     aliases: Sequence[str] = ("postgresql", "pg")
     family = "postgres"
-    ui = UiMeta(visible=True, label="PostgreSQL")
+    ui = UiMeta(
+        visible=True,
+        label="PostgreSQL",
+        icon="engines/postgres.svg",
+        description="开源对象-关系型数据库 / Open-source object-relational database",
+    )
     labels = EngineLabels(namespace="schema", collection="表", field="列")
     form_schema = FormSchema(
         fields=[

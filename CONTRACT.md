@@ -16,10 +16,18 @@ Skill 给宿主 Agent；MCP 只执行只读查询。Docker = 配置台 + 执行�
 
 ## 两级注册表
 
-1. `QueryBackend` 按 kind：`relational` / `document` / `kv` / `search`
-2. `EngineAdapter` 按 engine，挂在 Relational 下（`engines.registry.get(source.engine)`）
+1. `QueryBackend` 按 kind：`relational` / `document` / `kv` / `search` / `graph`
+2. `EngineAdapter` 按 engine（`engines.registry.get(source.engine)`）
 
-禁止按引擎名分支。新引擎 = 新文件 + `register()`。未实现 kind 必须走 `UnsupportedBackend`。dameng 由引擎适配用 `NotImplementedAdapter` 占位，`ui.visible=False`。`UiMeta` 含 `visible` + `label`（空则回退 `adapter.id`）。
+禁止按引擎名分支。新引擎 = 新文件 + `register()`。未实现 kind 必须走 `UnsupportedBackend`。
+
+`UiMeta`：`visible` + `label`（空则回退 `adapter.id`）+ `icon`（相对路径，如 `engines/postgres.svg`；前端本地托管，禁止外链）+ `description`（画廊卡片短描述）。
+
+关系型占位（达梦等）：`NotImplementedAdapter`，`visible=false`，无真驱动。
+
+Mongo / Redis / 搜索 / 图：`family=document|kv|search|graph` → `kind` 同 family；挂 Engine 注册表仅作画廊占位（`NotImplementedAdapter`），执行走 `UnsupportedBackend`；禁止写成 SQL 方言适配器。
+
+图标放在 `src/aidb/web/ui/public/engines/`（构建后 `static/engines/`），由配置台本地托管，禁止外链。
 
 ## Connection
 
@@ -35,9 +43,20 @@ Skill 给宿主 Agent；MCP 只执行只读查询。Docker = 配置台 + 执行�
 ## 配置台引擎 API
 
 - `GET /api/engines` → 仅 `visible_for_ui()`（下拉，不含 dameng 等占位）
-- `GET /api/engines/gallery` → `all_engines()`（含 `visible=false` 占位）；字段 `id` / `label` / `family` / `visible` / `form_schema`（`aliases` 可选）
+- `GET /api/engines/gallery` → `all_engines()`（含 `visible=false` 占位）；字段 `id` / `label` / `family` / `kind` / `visible` / `form_schema` / `icon` / `description`（`aliases` 可选）
 - 前端禁止写死引擎名单；新建连接页走 gallery；已有连接页保持独立
 - Connection CRUD 路径不变：`/api/connections` 不因画廊改动
+- `kind` 由 `kind_from_family(adapter.family)`：`mysql`/`postgres`/`oracle_like` → `relational`；其余 family（`document`/`kv`/`search`/`graph`）→ kind 同 family
+
+## 引擎适配必须覆盖的画廊引擎
+
+占位即可。禁止真驱动、禁止 `if engine==`、禁止把 Mongo/Redis/Neo4j 写成 SQL 方言适配器。新占位 = `engines/` 下新文件或 `engines/placeholders.py` + `register(NotImplementedAdapter(...))`。本架构 drop 不建完整占位墙。
+
+已 `visible=true`：`postgres`、`mysql`
+
+占位 `visible=false`（必须）：`dameng`、`oracle`、`sqlite`、`clickhouse`、`apache_doris`（id=`doris` 可，配 alias）、`duckdb`、`gaussdb`、`hive`、`mssql`、`oceanbase`、`starrocks`、`mongodb`、`redis`、`neo4j`
+
+可选（DB-GPT 墙）：`tugraph`、`spark`、`vertica`、`opengauss`、`access`、`hbase`、`cassandra`、`couchbase`、`db2`
 
 ## 进程模型
 

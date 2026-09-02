@@ -9,7 +9,7 @@ from aidb.models.connection import Connection, Kind
 
 
 class QueryBackend(ABC):
-    """一级注册表：按 kind（relational/document/kv/search）。
+    """一级注册表：按 kind（relational/document/kv/search/graph）。
 
     不变量：
     - 后端不生成查询语句；宿主 Agent 生成，本层只执行只读语句。

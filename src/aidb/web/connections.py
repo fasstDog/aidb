@@ -14,7 +14,11 @@ RELATIONAL_FAMILIES = frozenset({"mysql", "postgres", "oracle_like"})
 
 
 def kind_from_family(family: str) -> str:
-    """kind 由 family 决定，禁止按引擎名分支。"""
+    """kind 由 family 决定，禁止按引擎名分支。
+
+    关系型 family（mysql/postgres/oracle_like）→ kind=relational。
+    非关系型 family（document/kv/search/graph）→ kind 同 family。
+    """
 
     if family in RELATIONAL_FAMILIES:
         return "relational"

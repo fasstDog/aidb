@@ -6,8 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-Kind = Literal["relational", "document", "kv", "search"]
-Family = Literal["mysql", "postgres", "oracle_like", "document", "kv", "search"]
+Kind = Literal["relational", "document", "kv", "search", "graph"]
+Family = Literal["mysql", "postgres", "oracle_like", "document", "kv", "search", "graph"]
 
 
 class Connection(BaseModel):

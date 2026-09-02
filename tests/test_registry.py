@@ -45,6 +45,21 @@ class TestBackendRegistry(unittest.TestCase):
             backend.ping(source)
         self.assertEqual(ctx.exception.code, KIND_NOT_ENABLED)
 
+    def test_graph_kind_is_unsupported(self) -> None:
+        reg = BackendRegistry.builtin()
+        backend = reg.get("graph")
+        source = Connection(
+            id="x",
+            name="x",
+            kind="graph",
+            engine="neo4j",
+            family="graph",
+            config={},
+        )
+        with self.assertRaises(AidbError) as ctx:
+            backend.ping(source)
+        self.assertEqual(ctx.exception.code, KIND_NOT_ENABLED)
+
 
 class TestEngineRegistry(unittest.TestCase):
     def test_visible_empty_until_register(self) -> None:

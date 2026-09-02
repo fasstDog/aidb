@@ -21,7 +21,12 @@ class MysqlAdapter(EngineAdapter):
     id = "mysql"
     aliases: Sequence[str] = ("mariadb", "tidb")
     family = "mysql"
-    ui = UiMeta(visible=True, label="MySQL")
+    ui = UiMeta(
+        visible=True,
+        label="MySQL",
+        icon="engines/mysql.svg",
+        description="开源关系型数据库 / Open-source RDBMS（MariaDB / TiDB 同此）",
+    )
     labels = EngineLabels(namespace="数据库", collection="表", field="列")
     form_schema = FormSchema(
         fields=[

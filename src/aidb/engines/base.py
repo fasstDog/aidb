@@ -50,6 +50,8 @@ class UiMeta(BaseModel):
 
     visible: bool = True
     label: str = ""  # 画廊显示名；空则回退为 adapter.id
+    icon: str = ""  # 相对路径，如 engines/postgres.svg；前端本地托管，禁止外链
+    description: str = ""  # 画廊卡片短描述
 
 
 class EngineAdapter(ABC):

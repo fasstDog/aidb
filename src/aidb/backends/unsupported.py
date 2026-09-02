@@ -1,4 +1,4 @@
-"""未启用 kind 的空嘴。document/kv/search 现在就必须挂上，禁止静默落到 SQL。"""
+"""未启用 kind 的空嘴。document/kv/search/graph 现在就必须挂上，禁止静默落到 SQL。"""
 
 from __future__ import annotations
 

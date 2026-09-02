@@ -118,9 +118,15 @@ class TestWebEngines(unittest.TestCase):
         self.assertIn("mysql", by_id)
         self.assertIn("dameng", by_id)
         self.assertFalse(by_id["dameng"]["visible"])
-        required = {"id", "label", "family", "visible", "form_schema"}
+        required = {"id", "label", "family", "kind", "visible", "form_schema", "icon", "description"}
         for row in rows:
             self.assertTrue(required.issubset(row.keys()), row)
+            self.assertIsInstance(row["icon"], str)
+            self.assertIsInstance(row["description"], str)
+            self.assertIsInstance(row["kind"], str)
+        self.assertEqual(by_id["postgres"]["kind"], "relational")
+        self.assertEqual(by_id["mysql"]["kind"], "relational")
+        self.assertEqual(by_id["dameng"]["kind"], "relational")
         dropdown = [row["id"] for row in _engine_rows(self.client.get("/api/engines").json())]
         self.assertNotIn("dameng", dropdown)
 

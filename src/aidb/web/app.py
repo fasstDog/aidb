@@ -27,7 +27,7 @@ from aidb.models.overlay import CollectionOverlay, OverlayRef, SourceOverlay
 from aidb.store.bundle import export_bundle, import_bundle
 from aidb.store.connections import ConnectionStore
 from aidb.store.overlays import OverlayStore, default_data_root
-from aidb.web.connections import ConnectionRepo
+from aidb.web.connections import ConnectionRepo, kind_from_family
 from aidb.web.overlays import OverlayRepo
 from aidb.web.settings import Settings
 from aidb.web.util import (
@@ -173,14 +173,18 @@ def _serialize_engine(adapter: Any) -> dict[str, Any]:
 
 def _serialize_gallery_engine(adapter: Any) -> dict[str, Any]:
     """新建页引擎画廊：含 visible=false 占位。前端禁止写死名单。"""
-    label = (getattr(adapter.ui, "label", None) or "").strip() or adapter.id
+    ui = adapter.ui
+    label = (getattr(ui, "label", None) or "").strip() or adapter.id
     return {
         "id": adapter.id,
         "label": label,
         "family": adapter.family,
-        "visible": bool(adapter.ui.visible),
+        "kind": kind_from_family(adapter.family),
+        "visible": bool(ui.visible),
         "form_schema": adapter.form_schema.model_dump(mode="json"),
         "aliases": list(adapter.aliases),
+        "icon": getattr(ui, "icon", None) or "",
+        "description": getattr(ui, "description", None) or "",
     }
 
 

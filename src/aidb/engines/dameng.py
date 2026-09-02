@@ -13,6 +13,8 @@ register(
         aliases=("dm",),
         visible=False,
         label="达梦",
+        icon="engines/dameng.svg",
+        description="达梦数据库占位 / Dameng placeholder",
         labels=EngineLabels(namespace="schema", collection="表", field="列"),
         form_schema=FormSchema(
             fields=[

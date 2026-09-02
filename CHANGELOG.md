@@ -6,6 +6,7 @@
 - 新建数据源：引擎画廊 `GET /api/engines/gallery`，`visible` 可建连，其余灰卡「即将支持」
 - 目录树：schema → 表 → 字段（图标 + 类型 Tag + 已修）；右侧补丁/历史
 - `UiMeta.label`；前端不写死引擎名单
+- 画廊契约扩展：`kind` / `icon` / `description`；Kind/Family 增加 `graph`；未实现 kind 走 `UnsupportedBackend`
 
 ## 0.2.0 — 2026-09-02
 

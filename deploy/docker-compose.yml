@@ -1,0 +1,19 @@
+# Default bind is loopback. Do NOT publish 0.0.0.0.
+# Default image: PG/MySQL drivers + config UI (fastapi/uvicorn). No dmPython.
+services:
+  aidb:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: default
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      AIDB_BIND: "127.0.0.1"
+      AIDB_PORT: "8787"
+      AIDB_DATA: "/var/lib/aidb"
+    volumes:
+      - aidb-data:/var/lib/aidb   # overlays/{source_id}/...
+    restart: unless-stopped
+volumes:
+  aidb-data:

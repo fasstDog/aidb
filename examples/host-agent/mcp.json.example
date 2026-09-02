@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "aidb": {
+      "_comment": "入口以 MCP 核心为准。工具名必须是 list_sources / search_catalog / execute_readonly。只连本机，不要 0.0.0.0。",
+      "command": "python",
+      "args": ["-m", "aidb"],
+      "env": {
+        "AIDB_BIND": "127.0.0.1",
+        "AIDB_PORT": "8787"
+      }
+    }
+  }
+}

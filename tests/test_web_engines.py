@@ -26,6 +26,19 @@ def _engine_rows(payload):
     return []
 
 
+def _frontend_blob() -> str:
+    texts: list[str] = []
+    ui_src = SRC / "web" / "ui" / "src"
+    static = SRC / "web" / "static"
+    for folder in (ui_src, static):
+        if not folder.is_dir():
+            continue
+        for path in folder.rglob("*"):
+            if path.suffix.lower() in {".js", ".vue", ".ts", ".mjs", ".cjs"}:
+                texts.append(path.read_text(encoding="utf-8", errors="ignore"))
+    return "\n".join(texts)
+
+
 class TestWebEngines(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -56,13 +69,14 @@ class TestWebEngines(unittest.TestCase):
         self.assertIn("visible_for_ui", text)
 
     def test_js_fetches_api_engines_not_hardcoded_array(self) -> None:
-        js = (SRC / "web" / "static" / "app.js").read_text(encoding="utf-8")
-        self.assertIn("/api/engines", js)
-        self.assertIn("form_schema", js)
-        compact = re.sub(r"\s+", "", js)
+        blob = _frontend_blob()
+        self.assertTrue(blob.strip(), "vue source or built static js missing")
+        self.assertIn("/api/engines", blob)
+        self.assertIn("form_schema", blob)
+        compact = re.sub(r"\s+", "", blob)
         self.assertNotIn('["postgres","mysql"]', compact)
         self.assertNotIn("['postgres','mysql']", compact)
-        self.assertIsNone(re.search(r"engines\s*=\s*\[\s*['\"]postgres['\"]", js))
+        self.assertIsNone(re.search(r"engines\s*=\s*\[\s*['\"]postgres['\"]", blob))
 
     def test_post_connection_writes_json_connection_store_can_read(self) -> None:
         body = {
@@ -95,7 +109,10 @@ class TestWebEngines(unittest.TestCase):
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("配置台", resp.text)
-        self.assertIn("app.js", resp.text)
+        self.assertTrue(
+            "/static/" in resp.text or "app.js" in resp.text,
+            "index should reference built static assets",
+        )
 
 
 if __name__ == "__main__":

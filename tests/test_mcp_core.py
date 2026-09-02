@@ -254,3 +254,103 @@ class TestMcpCore(unittest.TestCase):
         self.assertEqual([i.collection for i in page2.items], ["items", "payments"])
         self.assertIsNone(page2.next_cursor)
 
+def _call_payload(result: object) -> dict:
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, tuple) and result:
+        for part in result:
+            if isinstance(part, dict) and ("code" in part or "columns" in part or "rows" in part):
+                return part
+            if hasattr(part, "structured_content") and isinstance(part.structured_content, dict):
+                return part.structured_content
+    sc = getattr(result, "structured_content", None)
+    if isinstance(sc, dict):
+        return sc
+    data = getattr(result, "data", None)
+    if isinstance(data, dict):
+        return data
+    content = getattr(result, "content", None)
+    if content:
+        raw = getattr(content[0], "text", None)
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+    raise AssertionError(f"unparsed tool result: {type(result)!r} {result!r}")
+
+
+class BoomBackend(QueryBackend):
+    kind = "relational"
+
+    def ping(self, source: Connection) -> None:
+        return None
+
+    def introspect_catalog(self, source: Connection, query: CatalogQuery) -> CatalogPage:
+        raise RuntimeError("boom catalog SELECT 1")
+
+    def execute_native(self, source: Connection, payload: ReadonlyPayload) -> QueryResult:
+        raise RuntimeError("boom execute SELECT secret FROM x")
+
+
+class TestExecuteReadonlyHostCompat(unittest.TestCase):
+    def setUp(self) -> None:
+        ensure_fake_adapter()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.svc = build_runtime(self.root, load=True)
+        self.svc.connections.put(_rel())
+        self.server = create_mcp_server(self.svc)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _exec(self, arguments: dict) -> dict:
+        return _call_payload(asyncio.run(self.server.call_tool("execute_readonly", arguments)))
+
+    def test_execute_readonly_sql_alias(self) -> None:
+        payload = self._exec({"source_id": "src1", "language": "sql", "sql": "SELECT 1"})
+        self.assertEqual(payload.get("columns"), ["id"])
+        self.assertEqual(payload.get("rows"), [[1]])
+        self.assertNotIn("code", payload)
+
+    def test_execute_readonly_query_alias(self) -> None:
+        payload = self._exec({"source_id": "src1", "query": "SELECT 1"})
+        self.assertEqual(payload.get("rows"), [[1]])
+
+    def test_execute_readonly_statement_canonical(self) -> None:
+        payload = self._exec({"source_id": "src1", "statement": "SELECT 1"})
+        self.assertEqual(payload.get("rows"), [[1]])
+
+    def test_execute_readonly_missing_body(self) -> None:
+        payload = self._exec({"source_id": "src1", "language": "sql"})
+        self.assertEqual(payload.get("code"), "missing_statement")
+        self.assertIn("statement", payload.get("message", ""))
+
+    def test_uncaught_exception_is_structured_engine_error(self) -> None:
+        boom = BoomBackend()
+        registry = BackendRegistry()
+        registry.register_relational(boom)
+        svc = AidbService(
+            connections=ConnectionStore(self.root),
+            overlays=OverlayStore(self.root),
+            backends=registry,
+        )
+        svc.connections.put(_rel())
+        server = create_mcp_server(svc)
+        payload = _call_payload(
+            asyncio.run(
+                server.call_tool(
+                    "execute_readonly",
+                    {"source_id": "src1", "sql": "SELECT secret FROM x"},
+                )
+            )
+        )
+        self.assertEqual(payload.get("code"), "engine_error")
+        blob = json.dumps(payload)
+        self.assertNotIn("SELECT secret", blob)
+        self.assertNotIn("RuntimeError", blob)
+        self.assertNotIn("s3cret-token-xyz", blob)
+

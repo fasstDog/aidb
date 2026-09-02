@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aidb"
-version = "0.1.0"
+version = "0.2.0"
 description = "AIDB architecture contracts"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2",  # DTO = Pydantic v2 BaseModel，禁止 dataclass
     "mcp",          # 官方 MCP Python SDK；禁止手写 JSON-RPC/MCP
+    "python-json-logger",  # 日志 JSON 格式；禁止 structlog / 自研 JSON
 ]
 # 基座不含数据库驱动。
 
@@ -18,7 +19,7 @@ postgres = ["psycopg[binary]>=3.1", "sqlglot"]
 mysql = ["pymysql>=1.1", "sqlglot"]
 web = ["fastapi", "uvicorn"]
 # default Docker 镜像 = 配置台 + 执行器：PG/MySQL 驱动 + sqlglot + FastAPI/uvicorn。不含 dameng/mongo。
-default = ["psycopg[binary]>=3.1", "pymysql>=1.1", "sqlglot", "fastapi", "uvicorn"]
+default = ["psycopg[binary]>=3.1", "pymysql>=1.1", "sqlglot", "fastapi", "uvicorn", "python-json-logger"]
 relational = ["psycopg[binary]>=3.1", "pymysql>=1.1", "sqlglot"]
 # dameng 不进入 default 镜像
 dameng = ["dmPython", "sqlglot"]

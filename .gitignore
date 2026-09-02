@@ -8,3 +8,5 @@ build/
 .aidb-data/
 AIDB_DATA/
 *.DS_Store
+node_modules/
+src/aidb/web/ui/node_modules/

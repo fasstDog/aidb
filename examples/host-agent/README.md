@@ -25,7 +25,7 @@ aidb 不内置模型。宿主（Cursor / Claude Code / 自建 Agent）负责读 
 1. `list_sources`（无数据源 → 请人去配置台，停止）
 2. `search_catalog`（分页 + `q`；读 overlays HEAD 与 `dialect_prompt`）
 3. 宿主写只读查询：补丁 > COMMENT > 列名猜测
-4. `execute_readonly`；`not_readonly` 就改语句，不绕门禁
+4. `execute_readonly`（正文参数名 `statement`，别名 `sql`/`query` 仅兼容）；`not_readonly` 就改语句，不绕门禁
 5. 回答里写清用了哪些集合和过滤条件；样例行原文不回给终端用户
 
 未启用的 kind（document / kv / search）会返回「该数据源类型尚未启用」，不要改写成 SQL 硬查。

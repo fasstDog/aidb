@@ -13,6 +13,8 @@ SOURCE_NOT_FOUND = "source_not_found"
 CONCURRENCY_LIMIT = "concurrency_limit"
 OVERLAY_NOT_FOUND = "overlay_not_found"
 INVALID_PATH = "invalid_path"
+ENGINE_ERROR = "engine_error"
+MISSING_STATEMENT = "missing_statement"
 
 DEFAULT_MESSAGES: dict[str, str] = {
     KIND_NOT_ENABLED: "该数据源类型尚未启用",
@@ -24,6 +26,8 @@ DEFAULT_MESSAGES: dict[str, str] = {
     CONCURRENCY_LIMIT: "并发执行已达上限",
     OVERLAY_NOT_FOUND: "覆盖层版本不存在",
     INVALID_PATH: "非法路径",
+    ENGINE_ERROR: "执行失败",
+    MISSING_STATEMENT: "需要 statement（别名 sql / query）",
 }
 
 

@@ -2,19 +2,45 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 
 from aidb import SERVER_VERSION
-from aidb.errors import AidbError
+from aidb.errors import ENGINE_ERROR, MISSING_STATEMENT, AidbError
+from aidb.logsetup import log_event
 from aidb.mcp.service import AidbService
 
 _INSTRUCTIONS = (
     "AIDB 只执行只读查询，不生成 SQL，不写补丁。"
     "顺序：list_sources → search_catalog → 宿主自写语句 → execute_readonly。"
 )
+
+
+
+def resolve_statement(
+    statement: str | None = None,
+    sql: str | None = None,
+    query: str | None = None,
+) -> str:
+    """Canonical field is statement; sql / query are host aliases."""
+
+    for candidate in (statement, sql, query):
+        if candidate is not None and str(candidate).strip() != "":
+            return str(candidate)
+    raise AidbError(MISSING_STATEMENT)
+
+
+def _tool_error(exc: BaseException, *, tool: str, source_id: str | None = None) -> dict[str, Any]:
+    """Never raise out of a tool: always {code,message,details}. Do not log SQL."""
+
+    if isinstance(exc, AidbError):
+        log_event(tool, tool=tool, code=exc.code, source_id=source_id)
+        return exc.to_dict()
+    log_event(tool, tool=tool, code=ENGINE_ERROR, source_id=source_id)
+    return AidbError(ENGINE_ERROR).to_dict()
 
 
 def create_mcp_server(service: AidbService | None = None) -> MCPServer:
@@ -31,8 +57,8 @@ def create_mcp_server(service: AidbService | None = None) -> MCPServer:
     def list_sources() -> dict[str, Any]:
         try:
             return service.list_sources()
-        except AidbError as exc:
-            return exc.to_dict()
+        except Exception as exc:
+            return _tool_error(exc, tool="list_sources")
 
     @server.tool(
         name="search_catalog",
@@ -58,20 +84,26 @@ def create_mcp_server(service: AidbService | None = None) -> MCPServer:
                 include_sample_values=include_sample_values,
             )
             return page.to_json_dict()
-        except AidbError as exc:
-            return exc.to_dict()
+        except Exception as exc:
+            return _tool_error(exc, tool="search_catalog", source_id=source_id)
 
-    @server.tool(name="execute_readonly", description="执行只读原生语句；关系型仅接受 sql")
+    @server.tool(
+        name="execute_readonly",
+        description="执行只读原生语句；关系型仅接受 sql。正文参数名 statement，别名 sql / query。",
+    )
     def execute_readonly(
         source_id: str,
-        language: Literal["sql", "mql", "dsl", "redis"],
-        statement: str,
+        language: Literal["sql", "mql", "dsl", "redis"] = "sql",
+        statement: str | None = None,
+        sql: str | None = None,
+        query: str | None = None,
     ) -> dict[str, Any]:
         try:
-            result = service.execute_readonly(source_id, language, statement)
+            text = resolve_statement(statement=statement, sql=sql, query=query)
+            result = service.execute_readonly(source_id, language, text)
             return result.model_dump(mode="json")
-        except AidbError as exc:
-            return exc.to_dict()
+        except Exception as exc:
+            return _tool_error(exc, tool="execute_readonly", source_id=source_id)
 
     return server
 
@@ -79,8 +111,22 @@ def create_mcp_server(service: AidbService | None = None) -> MCPServer:
 def attach(app) -> None:
     """Mount the three MCP tools onto an existing FastAPI/Starlette app. Same process, NO second port."""
 
+    from aidb.logsetup import configure_logging, log_event
     from aidb.runtime import build_runtime
 
+    data_root = None
+    state = getattr(app, "state", None)
+    if state is not None:
+        ctx = getattr(state, "ctx", None) or getattr(state, "aidb", None)
+        if ctx is not None:
+            data_root = getattr(ctx, "root", None)
+    bind = os.environ.get("AIDB_BIND", "127.0.0.1")
+    try:
+        port = int(os.environ.get("AIDB_PORT", "8787"))
+    except ValueError:
+        port = 8787
+    configure_logging(data_root=data_root, bind=bind, port=port)
+    log_event("process_start", version=SERVER_VERSION, bind=bind, port=port)
     service = build_runtime()
     mcp = create_mcp_server(service)
     # streamable-http 挂在 /mcp；先建 app 以创建 session_manager，再把 lifespan 并入配置台。
@@ -107,4 +153,8 @@ def attach(app) -> None:
 def run_stdio() -> None:
     """本地宿主：stdio 传输。Docker 走 python -m aidb.web + attach()。"""
 
+    from aidb.logsetup import configure_logging, log_event
+
+    configure_logging()
+    log_event("process_start", version=SERVER_VERSION, bind="stdio")
     create_mcp_server().run(transport="stdio")

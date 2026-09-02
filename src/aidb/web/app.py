@@ -19,7 +19,9 @@ from aidb.backends.relational import RelationalBackend
 from aidb.engines import load_engines
 from aidb.engines.registry import get as get_adapter
 from aidb.engines.registry import visible_for_ui
+from aidb import SERVER_VERSION
 from aidb.errors import CATALOG_PAGE_REQUIRED, INVALID_PATH, AidbError
+from aidb.logsetup import configure_logging, log_event
 from aidb.models.catalog import CatalogQuery, OverlayHead
 from aidb.models.overlay import CollectionOverlay, OverlayRef, SourceOverlay
 from aidb.store.bundle import export_bundle, import_bundle
@@ -275,6 +277,14 @@ def create_app(root: Path | str | None = None, *, token: str | None = None) -> F
         auto_keep=keep,
     )
 
+    bind = os.environ.get("AIDB_BIND", "127.0.0.1")
+    try:
+        port = int(os.environ.get("AIDB_PORT", "8787"))
+    except ValueError:
+        port = 8787
+    configure_logging(data_root=data_root, bind=bind, port=port)
+    log_event("process_start", version=SERVER_VERSION, bind=bind, port=port)
+
     app = FastAPI(title="AIDB 配置台", docs_url=None, redoc_url=None)
     app.state.ctx = ctx
     app.state.aidb = ctx
@@ -372,7 +382,31 @@ def create_app(root: Path | str | None = None, *, token: str | None = None) -> F
     def api_ping(source_id: str) -> dict[str, Any]:
         store_ctx = _ctx()
         conn = store_ctx.connections.require(source_id)
-        store_ctx.backends.get(conn.kind).ping(conn)
+        try:
+            store_ctx.backends.get(conn.kind).ping(conn)
+        except Exception:
+            log_event(
+                "ping",
+                source_id=conn.id,
+                kind=conn.kind,
+                engine=conn.engine,
+                ok=False,
+            )
+            raise
+        log_event(
+            "connect",
+            source_id=conn.id,
+            kind=conn.kind,
+            engine=conn.engine,
+            ok=True,
+        )
+        log_event(
+            "ping",
+            source_id=conn.id,
+            kind=conn.kind,
+            engine=conn.engine,
+            ok=True,
+        )
         return {"ok": True}
 
     @app.get("/api/catalog")

@@ -41,7 +41,7 @@ description: >-
 1. **`list_sources`** — 元数据，不含密钥。核对 `server_version`。
 2. **`search_catalog`** — 中性目录 + overlays 的 **HEAD** + `dialect_prompt`。必须带分页（`limit` 默认 20，最大 100）；用 `q` / `namespace` / `collection` 缩小范围，跟 `next_cursor` 翻页。禁止一次要全部对象。
 3. 宿主根据目录、overlays、`dialect_prompt` **自己写**只读查询。
-4. **`execute_readonly`** — `payload.language` 为 `sql | mql | dsl | redis`；关系型只接受 `sql`。
+4. **`execute_readonly`** — 正文参数名是 `statement`（别名 `sql` / `query` 仅兼容旧宿主）。`payload.language` 为 `sql | mql | dsl | redis`；关系型只接受 `sql`。
 
 没有数据源 → 停，请开发者在配置台添加。不要空转去搜目录。
 
@@ -96,6 +96,8 @@ description: >-
 
 ### `execute_readonly`
 
+正文参数名**写死 `statement`**。服务端兼容别名 `sql` / `query`（有 `statement` 时以它为准），宿主新代码不要用别名，避免和 `language: "sql"` 搞混。不要另发明 `text` / `q` / `body`。
+
 ```json
 {
   "source_id": "src_1",
@@ -104,7 +106,7 @@ description: >-
 }
 ```
 
-结果：`columns`、`rows`、`truncated`、`row_count_capped`。行数与超时由服务端截断，宿主不要为了拿更多行去关截断。
+结果：`columns`、`rows`、`truncated`、`row_count_capped`。行数与超时由服务端截断，宿主不要为了拿更多行去关截断。失败一律 `{code,message,details}`，不要把 SDK 调用打红当成无结构异常。
 
 ## 结构化错误（改查询，不要改协议）
 
@@ -115,6 +117,8 @@ description: >-
 | `language_mismatch` | 查询语言与数据源类型不匹配 | 关系型改回 `sql` |
 | `not_readonly` | 语句不是只读查询 | 改成只读再执行 |
 | `catalog_page_required` | 目录查询必须分页 | 补上 `limit` |
+| `missing_statement` | 没有查询正文 | 补上 `statement`（不要只传空字符串） |
+| `engine_error` | 引擎执行失败 | 看 `details.kind`：`connect` 连不上 / `timeout` 超时 / `syntax` 语法。不要把语句或密码要出来 |
 
 ## 答不准时
 

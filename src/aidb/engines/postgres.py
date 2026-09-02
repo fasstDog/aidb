@@ -63,13 +63,13 @@ class PostgresAdapter(EngineAdapter):
         except AidbError:
             raise
         except Exception as exc:
-            raise engine_error(self.id, "连接") from exc
+            raise engine_error(self.id, "连接", exc) from exc
 
     def ping(self, handle: Any) -> None:
         try:
             handle.execute("SELECT 1")
         except Exception as exc:
-            raise engine_error(self.id, "探活") from exc
+            raise engine_error(self.id, "探活", exc) from exc
 
     def list_schemas(self, handle: Any) -> list[str]:
         sql = """
@@ -84,7 +84,7 @@ class PostgresAdapter(EngineAdapter):
             rows = handle.execute(sql, (list(_SYSTEM_SCHEMAS),)).fetchall()
             return [r[0] for r in rows]
         except Exception as exc:
-            raise engine_error(self.id, "列出 schema") from exc
+            raise engine_error(self.id, "列出 schema", exc) from exc
 
     def list_tables(self, handle: Any, schema: str) -> list[str]:
         sql = """
@@ -100,7 +100,7 @@ class PostgresAdapter(EngineAdapter):
             rows = handle.execute(sql, (schema,)).fetchall()
             return [r[0] for r in rows]
         except Exception as exc:
-            raise engine_error(self.id, "列出表") from exc
+            raise engine_error(self.id, "列出表", exc) from exc
 
     def list_columns(self, handle: Any, schema: str, table: str) -> list[Column]:
         sql = """
@@ -120,7 +120,7 @@ class PostgresAdapter(EngineAdapter):
             rows = handle.execute(sql, (schema, table)).fetchall()
             return [Column(name=r[0], type=str(r[1]), comment=r[2]) for r in rows]
         except Exception as exc:
-            raise engine_error(self.id, "列出列") from exc
+            raise engine_error(self.id, "列出列", exc) from exc
 
     def list_fks(self, handle: Any, schema: str, table: str) -> list[dict[str, Any]]:
         sql = """
@@ -159,7 +159,7 @@ class PostgresAdapter(EngineAdapter):
                 for r in rows
             ]
         except Exception as exc:
-            raise engine_error(self.id, "列出外键") from exc
+            raise engine_error(self.id, "列出外键", exc) from exc
 
     def sample_values(
         self,
@@ -184,7 +184,7 @@ class PostgresAdapter(EngineAdapter):
             rows = handle.execute(q).fetchall()
             return [jsonable_cell(r[0], max_len=64) for r in rows]
         except Exception as exc:
-            raise engine_error(self.id, "采样") from exc
+            raise engine_error(self.id, "采样", exc) from exc
 
     def quote_ident(self, name: str) -> str:
         if not name or "\x00" in name:
@@ -236,7 +236,7 @@ class PostgresAdapter(EngineAdapter):
         except AidbError:
             raise
         except Exception as exc:
-            raise engine_error(self.id, "执行查询") from exc
+            raise engine_error(self.id, "执行查询", exc) from exc
 
     def close(self, handle: Any) -> None:
         try:

@@ -100,18 +100,26 @@ def execute_readonly(
     language: str,
     statement: str,
 ) -> dict[str, Any]:
-    """只执行。若 not_readonly，改语句再调，不要绕过门禁。"""
+    """只执行。正文参数名写死 statement（服务端兼容 sql/query，这里不用）。
+
+    若 not_readonly，改语句再调，不要绕过门禁。
+    """
     result = client.call(
         "execute_readonly",
         {"source_id": source_id, "language": language, "statement": statement},
     )
     code = result.get("code")
+    if code == "missing_statement":
+        raise RuntimeError("缺少 statement：补上查询正文，不要改用 text/q/body")
     if code == "not_readonly":
         raise RuntimeError("语句不是只读查询：改写成只读后再 execute_readonly，不要绕过门禁")
     if code == "kind_not_enabled":
         raise RuntimeError("该数据源类型尚未启用，不要改写成 SQL 硬查")
     if code == "language_mismatch":
         raise RuntimeError("查询语言与数据源类型不匹配（关系型必须 language=sql）")
+    if code == "engine_error":
+        kind = (result.get("details") or {}).get("kind")
+        raise RuntimeError(f"引擎失败 kind={kind}（connect/timeout/syntax），不要回放语句或要密码")
     return result
 
 

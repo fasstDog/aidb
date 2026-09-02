@@ -10,7 +10,8 @@ from pydantic import ValidationError
 
 from aidb.backends.registry import BackendRegistry
 from aidb.catalog.assemble import assemble_catalog
-from aidb.errors import CATALOG_PAGE_REQUIRED, CONCURRENCY_LIMIT, LANGUAGE_MISMATCH, AidbError
+from aidb.errors import CATALOG_PAGE_REQUIRED, CONCURRENCY_LIMIT, LANGUAGE_MISMATCH, NOT_READONLY, AidbError
+from aidb.logsetup import log_event
 from aidb.models.catalog import CatalogPage, CatalogQuery, QueryResult, ReadonlyPayload
 from aidb.store.connections import ConnectionStore
 from aidb.store.overlays import OverlayStore
@@ -47,6 +48,7 @@ class AidbService:
     def list_sources(self) -> dict[str, Any]:
         from aidb import SERVER_VERSION
 
+        log_event("list_sources", tool="list_sources")
         return {
             "server_version": SERVER_VERSION,
             "sources": self.connections.public_meta(),
@@ -63,6 +65,13 @@ class AidbService:
         include_sample_values: bool = False,
     ) -> CatalogPage:
         source = self.connections.require(source_id)
+        log_event(
+            "search_catalog",
+            tool="search_catalog",
+            source_id=source.id,
+            kind=source.kind,
+            engine=source.engine,
+        )
         try:
             query = CatalogQuery(
                 source_id=source_id,
@@ -82,6 +91,14 @@ class AidbService:
 
     def execute_readonly(self, source_id: str, language: str, statement: str) -> QueryResult:
         source = self.connections.require(source_id)
+        log_event(
+            "execute_readonly",
+            tool="execute_readonly",
+            source_id=source.id,
+            kind=source.kind,
+            engine=source.engine,
+            language=language,
+        )
         try:
             payload = ReadonlyPayload(source_id=source_id, language=language, statement=statement)  # type: ignore[arg-type]
         except ValidationError as exc:
@@ -98,5 +115,17 @@ class AidbService:
             )
         try:
             return backend.execute_native(source, payload)
+        except AidbError as exc:
+            if exc.code == NOT_READONLY:
+                log_event(
+                    "readonly_rejected",
+                    tool="execute_readonly",
+                    source_id=source.id,
+                    language=language,
+                    code=exc.code,
+                    kind=source.kind,
+                    engine=source.engine,
+                )
+            raise
         finally:
             self._sem.release()

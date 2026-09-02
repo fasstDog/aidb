@@ -46,7 +46,7 @@ from aidb.models import (
     VersionMeta,
 )
 
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = "0.2.1"
 MIN_SERVER_VERSION = "0.1.0"  # Skill authors pin this
 
 __all__ = [

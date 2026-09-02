@@ -2,7 +2,7 @@
 
 契约不变：MCP 只有 `list_sources` / `search_catalog` / `execute_readonly`；Docker 不调模型、不配 API Key；核心禁止 `if engine ==`、方言与驱动。入口对不上改调用，不改契约。
 
-当前发布：`v0.2.0`。
+当前发布：`v0.2.1`。
 
 ## 0.2（已发布）
 

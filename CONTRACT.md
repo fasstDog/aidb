@@ -19,7 +19,7 @@ Skill 给宿主 Agent；MCP 只执行只读查询。Docker = 配置台 + 执行�
 1. `QueryBackend` 按 kind：`relational` / `document` / `kv` / `search`
 2. `EngineAdapter` 按 engine，挂在 Relational 下（`engines.registry.get(source.engine)`）
 
-禁止按引擎名分支。新引擎 = 新文件 + `register()`。未实现 kind 必须走 `UnsupportedBackend`。dameng 由引擎适配用 `NotImplementedAdapter` 占位，`ui.visible=False`。
+禁止按引擎名分支。新引擎 = 新文件 + `register()`。未实现 kind 必须走 `UnsupportedBackend`。dameng 由引擎适配用 `NotImplementedAdapter` 占位，`ui.visible=False`。`UiMeta` 含 `visible` + `label`（空则回退 `adapter.id`）。
 
 ## Connection
 
@@ -31,6 +31,13 @@ Skill 给宿主 Agent；MCP 只执行只读查询。Docker = 配置台 + 执行�
 - `overlays/{source_id}/_source/versions/{ts}_{id}.json`
 - `overlays/{source_id}/{namespace}/{collection}/HEAD.json`
 - `overlays/{source_id}/{namespace}/{collection}/versions/{ts}_{id}.json`
+
+## 配置台引擎 API
+
+- `GET /api/engines` → 仅 `visible_for_ui()`（下拉，不含 dameng 等占位）
+- `GET /api/engines/gallery` → `all_engines()`（含 `visible=false` 占位）；字段 `id` / `label` / `family` / `visible` / `form_schema`（`aliases` 可选）
+- 前端禁止写死引擎名单；新建连接页走 gallery；已有连接页保持独立
+- Connection CRUD 路径不变：`/api/connections` 不因画廊改动
 
 ## 进程模型
 
@@ -45,7 +52,7 @@ CMD `python -m aidb.web` 读 `AIDB_BIND` / `AIDB_PORT`（默认 127.0.0.1:8787�
 - `information_schema` / `pg_catalog` / 自行拼接分页 / 反引号标识符
 - `execute_readonly` 直接调用 psycopg / pymysql
 - Overlay DTO 只有 `table_name` 没有 `collection`
-- 前端写死引擎列表（必须 `visible_for_ui()`）
+- 前端写死引擎列表（下拉必须 `visible_for_ui()` / `GET /api/engines`；新建页必须 `all_engines()` / `GET /api/engines/gallery`）
 - `if engine ==` / `if source.engine ==`
 
 ## 目录归属
@@ -55,7 +62,7 @@ CMD `python -m aidb.web` 读 `AIDB_BIND` / `AIDB_PORT`（默认 127.0.0.1:8787�
 | `src/aidb/backends`、`models`、`engines/{base,registry,not_implemented}` | 架构守门（本 drop） |
 | `src/aidb/engines/postgres.py` `mysql.py` `dameng.py` | 引擎适配 |
 | MCP 工具、overlay 版本库、`aidb.mcp.server.attach` | MCP 核心 |
-| `src/aidb/web/` | 配置台；下拉 = `visible_for_ui()` |
+| `src/aidb/web/` | 配置台；下拉 = `visible_for_ui()`；画廊 = `all_engines()` |
 | `skills/aidb/SKILL.md` | Skill 作者；`min` = `aidb.MIN_SERVER_VERSION` |
 | `deploy/` | 本 drop |
 

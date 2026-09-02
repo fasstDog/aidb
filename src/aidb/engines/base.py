@@ -49,6 +49,7 @@ class UiMeta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     visible: bool = True
+    label: str = ""  # 画廊显示名；空则回退为 adapter.id
 
 
 class EngineAdapter(ABC):

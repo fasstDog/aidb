@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-09-02
+
+- 配置台连接页：卡片网格（引擎图标、名称、host/库摘要、测通、已修）
+- 新建数据源：引擎画廊 `GET /api/engines/gallery`，`visible` 可建连，其余灰卡「即将支持」
+- 目录树：schema → 表 → 字段（图标 + 类型 Tag + 已修）；右侧补丁/历史
+- `UiMeta.label`；前端不写死引擎名单
+
 ## 0.2.0 — 2026-09-02
 
 - 进程日志：标准库 `logging` + `RotatingFileHandler` + `python-json-logger`（非 structlog / 非自研 JSON）

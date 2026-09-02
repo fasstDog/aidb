@@ -1,4 +1,4 @@
-"""AIDB 配置台 FastAPI 应用。引擎下拉只走 visible_for_ui()。"""
+"""AIDB 配置台 FastAPI 应用。下拉 visible_for_ui()；画廊 all_engines()。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from aidb.backends.registry import BackendRegistry
 from aidb.backends.relational import RelationalBackend
 from aidb.engines import load_engines
 from aidb.engines.registry import get as get_adapter
-from aidb.engines.registry import visible_for_ui
+from aidb.engines.registry import all_engines, visible_for_ui
 from aidb import SERVER_VERSION
 from aidb.errors import CATALOG_PAGE_REQUIRED, INVALID_PATH, AidbError
 from aidb.logsetup import configure_logging, log_event
@@ -168,6 +168,19 @@ def _serialize_engine(adapter: Any) -> dict[str, Any]:
         "labels": adapter.labels.model_dump(mode="json"),
         "form_schema": adapter.form_schema.model_dump(mode="json"),
         "ui": adapter.ui.model_dump(mode="json"),
+    }
+
+
+def _serialize_gallery_engine(adapter: Any) -> dict[str, Any]:
+    """新建页引擎画廊：含 visible=false 占位。前端禁止写死名单。"""
+    label = (getattr(adapter.ui, "label", None) or "").strip() or adapter.id
+    return {
+        "id": adapter.id,
+        "label": label,
+        "family": adapter.family,
+        "visible": bool(adapter.ui.visible),
+        "form_schema": adapter.form_schema.model_dump(mode="json"),
+        "aliases": list(adapter.aliases),
     }
 
 
@@ -330,6 +343,11 @@ def create_app(root: Path | str | None = None, *, token: str | None = None) -> F
     def api_engines() -> list[dict[str, Any]]:
         # dropdown: visible_for_ui() only
         return [_serialize_engine(adapter) for adapter in visible_for_ui()]
+
+    @app.get("/api/engines/gallery")
+    def api_engines_gallery() -> list[dict[str, Any]]:
+        # 新建页引擎卡片墙：全部已注册（含占位）。visible=false 前端 disable。
+        return [_serialize_gallery_engine(adapter) for adapter in all_engines()]
 
     @app.get("/api/connections")
     def api_list_connections() -> list[dict[str, Any]]:

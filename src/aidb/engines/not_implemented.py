@@ -29,11 +29,12 @@ class NotImplementedAdapter(EngineAdapter):
         form_schema: FormSchema | None = None,
         labels: EngineLabels | None = None,
         visible: bool = False,
+        label: str = "",
     ) -> None:
         self.id = id
         self.aliases = tuple(aliases)
         self.family = family
-        self.ui = UiMeta(visible=visible)
+        self.ui = UiMeta(visible=visible, label=label)
         self.form_schema = form_schema if form_schema is not None else FormSchema()
         self.labels = (
             labels

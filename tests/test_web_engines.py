@@ -71,7 +71,11 @@ class TestWebEngines(unittest.TestCase):
     def test_js_fetches_api_engines_not_hardcoded_array(self) -> None:
         blob = _frontend_blob()
         self.assertTrue(blob.strip(), "vue source or built static js missing")
-        self.assertIn("/api/engines", blob)
+        self.assertTrue(
+            "/api/engines" in blob,
+            "frontend must fetch engines from API (dropdown)",
+        )
+        self.assertIn("/api/engines/gallery", blob)
         self.assertIn("form_schema", blob)
         compact = re.sub(r"\s+", "", blob)
         self.assertNotIn('["postgres","mysql"]', compact)
@@ -104,6 +108,21 @@ class TestWebEngines(unittest.TestCase):
         sources = self.tmp_path / "sources.json"
         per_file = self.tmp_path / "connections" / f"{cid}.json"
         self.assertTrue(sources.is_file() or per_file.is_file())
+
+    def test_get_engines_gallery_includes_dameng_disabled(self) -> None:
+        resp = self.client.get("/api/engines/gallery")
+        self.assertEqual(resp.status_code, 200)
+        rows = _engine_rows(resp.json())
+        by_id = {row["id"]: row for row in rows}
+        self.assertIn("postgres", by_id)
+        self.assertIn("mysql", by_id)
+        self.assertIn("dameng", by_id)
+        self.assertFalse(by_id["dameng"]["visible"])
+        required = {"id", "label", "family", "visible", "form_schema"}
+        for row in rows:
+            self.assertTrue(required.issubset(row.keys()), row)
+        dropdown = [row["id"] for row in _engine_rows(self.client.get("/api/engines").json())]
+        self.assertNotIn("dameng", dropdown)
 
     def test_index_html_served(self) -> None:
         resp = self.client.get("/")

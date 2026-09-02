@@ -3,11 +3,19 @@ import { api, engineRows, schemaFields, isSecretField } from "./api";
 
 const THEME_KEY = "aidb-theme";
 
+const HOST_KEYS = ["host", "hostname", "server", "addr", "address"];
+const PORT_KEYS = ["port"];
+const DB_KEYS = ["dbname", "database", "db", "schema", "catalog", "sid", "service_name"];
+
 export const state = reactive({
   dark: localStorage.getItem(THEME_KEY) === "dark",
+  view: "home",
   engines: [],
+  gallery: [],
   connections: [],
   selectedId: null,
+  pingStatus: {},
+  sourcePatched: {},
   labels: { namespace: "命名空间", collection: "集合", field: "字段" },
   overlayKind: "source",
   overlayNs: null,
@@ -22,7 +30,12 @@ export const state = reactive({
   treeMsg: "请选择数据源",
   treeRoot: null,
   catalogQ: "",
+  selectedNodeKey: "",
+  focusField: "",
   connForm: { id: "", name: "", engine: null, config: {} },
+  drawerShow: false,
+  drawerMode: "create",
+  drawerStep: "gallery",
 });
 
 export function setDark(value) {
@@ -31,7 +44,33 @@ export function setDark(value) {
 }
 
 export function engineById(id) {
-  return state.engines.find((e) => e.id === id) || null;
+  const fromEngines = state.engines.find((e) => e.id === id);
+  if (fromEngines) return fromEngines;
+  const fromGallery = state.gallery.find((e) => e.id === id);
+  if (!fromGallery) return null;
+  return {
+    id: fromGallery.id,
+    family: fromGallery.family,
+    aliases: fromGallery.aliases || [],
+    form_schema: fromGallery.form_schema,
+    labels: fromGallery.labels,
+    ui: fromGallery.ui || {
+      visible: fromGallery.visible !== false,
+      label: fromGallery.label || fromGallery.id,
+    },
+    label: fromGallery.label || fromGallery.id,
+  };
+}
+
+export function engineLabel(engineId) {
+  if (!engineId) return "";
+  const g = state.gallery.find((e) => e.id === engineId);
+  if (g && (g.label || g.id)) return g.label || g.id;
+  const e = engineById(engineId);
+  if (!e) return engineId;
+  if (e.ui && e.ui.label) return e.ui.label;
+  if (e.label) return e.label;
+  return e.id || engineId;
 }
 
 export function applyEngineLabels(engine) {
@@ -52,12 +91,40 @@ export function applyCatalogLabels(labels) {
   };
 }
 
+function pickConfigValue(config, candidates) {
+  const cfg = config && typeof config === "object" ? config : {};
+  const keys = Object.keys(cfg);
+  for (const want of candidates) {
+    const wantLc = String(want).toLowerCase();
+    for (const k of keys) {
+      if (String(k).toLowerCase() !== wantLc) continue;
+      const raw = cfg[k];
+      if (raw == null || raw === "") continue;
+      const text = String(raw).trim();
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
+/** 通用摘要：host:port / db，不按引擎名分支。 */
+export function connectionSummary(config) {
+  const host = pickConfigValue(config, HOST_KEYS);
+  const port = pickConfigValue(config, PORT_KEYS);
+  const db = pickConfigValue(config, DB_KEYS);
+  const hostPort = host ? (port ? host + ":" + port : host) : port;
+  if (hostPort && db) return hostPort + " / " + db;
+  return hostPort || db || "";
+}
+
 export async function loadEngines() {
   const data = await api("/api/engines");
   state.engines = engineRows(data);
-  if (!state.connForm.engine && state.engines.length) {
-    rebuildForm(state.engines[0].id);
-  }
+}
+
+export async function loadGallery() {
+  const data = await api("/api/engines/gallery");
+  state.gallery = engineRows(data);
 }
 
 export function rebuildForm(engineId, config) {
@@ -102,7 +169,8 @@ export function fillConnectionForm(conn) {
   if (!conn) {
     state.connForm.id = "";
     state.connForm.name = "";
-    rebuildForm(state.connForm.engine || (state.engines[0] && state.engines[0].id));
+    state.connForm.engine = null;
+    state.connForm.config = {};
     return;
   }
   state.connForm.id = conn.id;
@@ -110,9 +178,55 @@ export function fillConnectionForm(conn) {
   rebuildForm(conn.engine, conn.config || {});
 }
 
+export async function refreshSourcePatched() {
+  const next = { ...state.sourcePatched };
+  await Promise.all(
+    (state.connections || []).map(async (conn) => {
+      try {
+        const data = await api("/api/sources/" + encodeURIComponent(conn.id) + "/overlay");
+        next[conn.id] = !!data.patched;
+      } catch {
+        next[conn.id] = false;
+      }
+    })
+  );
+  state.sourcePatched = next;
+}
+
 export async function refreshConnections() {
   const data = await api("/api/connections");
   state.connections = Array.isArray(data) ? data : data.connections || [];
+  await refreshSourcePatched();
+}
+
+export function pingOf(id) {
+  return state.pingStatus[id] || "unknown";
+}
+
+export async function pingConnection(id) {
+  if (!id) return false;
+  try {
+    await api("/api/connections/" + encodeURIComponent(id) + "/ping", { method: "POST" });
+    state.pingStatus = { ...state.pingStatus, [id]: "ok" };
+    return true;
+  } catch (err) {
+    state.pingStatus = { ...state.pingStatus, [id]: "fail" };
+    throw err;
+  }
+}
+
+export function goHome() {
+  state.view = "home";
+  state.selectedId = null;
+  state.treeRoot = null;
+  state.treeMsg = "请选择数据源";
+  state.versions = [];
+  state.histView = "";
+  state.selectedNodeKey = "";
+  state.focusField = "";
+  state.overlayKind = "source";
+  state.overlayNs = null;
+  state.overlayColl = null;
 }
 
 export async function selectConnection(id) {
@@ -122,9 +236,43 @@ export async function selectConnection(id) {
   state.overlayKind = "source";
   state.overlayNs = null;
   state.overlayColl = null;
+  state.focusField = "";
   await loadSourceOverlay();
   await loadCatalogRoot();
   await loadHistory();
+}
+
+export async function openDetail(id) {
+  state.view = "detail";
+  await selectConnection(id);
+}
+
+export function openCreateDrawer() {
+  fillConnectionForm(null);
+  state.drawerMode = "create";
+  state.drawerStep = "gallery";
+  state.drawerShow = true;
+}
+
+export function openEditDrawer(conn) {
+  const row = conn || state.connections.find((c) => c.id === state.selectedId);
+  fillConnectionForm(row);
+  state.drawerMode = "edit";
+  state.drawerStep = "form";
+  state.drawerShow = true;
+}
+
+export function pickGalleryEngine(item) {
+  if (!item || item.visible === false) return false;
+  state.connForm.id = "";
+  state.connForm.name = "";
+  rebuildForm(item.id);
+  state.drawerStep = "form";
+  return true;
+}
+
+export function closeDrawer() {
+  state.drawerShow = false;
 }
 
 export async function loadCatalog(params) {
@@ -142,7 +290,9 @@ function itemToNode(item) {
       kind: "collection",
       namespace: item.namespace || "",
       collection: item.collection,
-      label: (state.labels.collection || "集合") + " · " + item.collection,
+      name: item.collection,
+      kindLabel: state.labels.collection || "集合",
+      label: item.collection,
       patched: !!item.patched,
       open: false,
       children: [],
@@ -158,7 +308,9 @@ function itemToNode(item) {
       kind: "namespace",
       namespace: item.namespace,
       collection: null,
-      label: (state.labels.namespace || "命名空间") + " · " + item.namespace,
+      name: item.namespace,
+      kindLabel: state.labels.namespace || "命名空间",
+      label: item.namespace,
       patched: false,
       open: false,
       children: [],
@@ -194,10 +346,13 @@ export async function loadCatalogRoot() {
       limit: 50,
     });
     applyCatalogLabels(page.labels);
+    const conn = state.connections.find((c) => c.id === state.selectedId);
     const root = {
       key: "source",
       kind: "source",
-      label: "数据源",
+      name: (conn && (conn.name || conn.id)) || "数据源",
+      kindLabel: "数据源",
+      label: (conn && (conn.name || conn.id)) || "数据源",
       patched: !!(page.source_patched || page.patched),
       open: true,
       children: [],
@@ -209,6 +364,7 @@ export async function loadCatalogRoot() {
     appendItems(root, page);
     state.treeRoot = root;
     state.treeMsg = "";
+    state.selectedNodeKey = "source";
   } catch (err) {
     state.treeMsg = err.message || "加载失败";
   }
@@ -265,7 +421,11 @@ export async function loadNodeChildren(node) {
           kind: "field",
           namespace: node.namespace,
           collection: node.collection,
-          label: (state.labels.field || "字段") + " · " + col.name,
+          name: col.name,
+          type: col.type || "",
+          comment: col.comment || "",
+          kindLabel: state.labels.field || "字段",
+          label: col.name,
           patched,
           open: false,
           children: [],
@@ -297,6 +457,7 @@ export async function loadMore(node) {
 
 export function isNodeActive(node) {
   if (!node) return false;
+  if (state.selectedNodeKey) return node.key === state.selectedNodeKey;
   if (node.kind === "source") return state.overlayKind === "source";
   if (node.kind === "collection") {
     return (
@@ -310,12 +471,21 @@ export function isNodeActive(node) {
 
 export async function activateNode(node) {
   if (!node) return;
+  state.selectedNodeKey = node.key;
+  state.focusField = node.kind === "field" ? node.name : "";
   if (node.kind === "source") {
     state.overlayKind = "source";
     state.overlayNs = null;
     state.overlayColl = null;
     await loadSourceOverlay();
     await loadHistory();
+    return;
+  }
+  if (node.kind === "namespace") {
+    if (!node.open && !node.loaded) {
+      node.open = true;
+      await loadNodeChildren(node);
+    }
     return;
   }
   if (node.kind === "collection") {
@@ -375,6 +545,7 @@ export async function loadSourceOverlay() {
     query_rules: body.query_rules || "",
   };
   state.overlayPatched = !!data.patched;
+  state.sourcePatched = { ...state.sourcePatched, [state.selectedId]: !!data.patched };
 }
 
 export async function loadCollectionOverlay() {
@@ -406,6 +577,7 @@ export async function saveOverlay() {
       method: "PUT",
       body: { description: state.collectionOverlay.description, fields },
     });
+    await loadCollectionOverlay();
   } else {
     await api("/api/sources/" + encodeURIComponent(state.selectedId) + "/overlay", {
       method: "PUT",
@@ -414,6 +586,7 @@ export async function saveOverlay() {
         query_rules: state.sourceOverlay.query_rules,
       },
     });
+    await loadSourceOverlay();
   }
   await loadCatalogRoot();
   await loadHistory();

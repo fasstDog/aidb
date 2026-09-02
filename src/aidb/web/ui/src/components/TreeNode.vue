@@ -1,5 +1,12 @@
 <script setup>
 import {
+  CubeOutline,
+  FolderOutline,
+  GridOutline,
+  LayersOutline,
+  ServerOutline,
+} from "@vicons/ionicons5";
+import {
   expandNode,
   loadMore,
   activateNode,
@@ -9,6 +16,13 @@ import {
 defineProps({
   node: { type: Object, required: true },
 });
+
+const KIND_ICON = {
+  source: ServerOutline,
+  namespace: FolderOutline,
+  collection: GridOutline,
+  field: CubeOutline,
+};
 </script>
 
 <template>
@@ -26,7 +40,29 @@ defineProps({
       >
         {{ node.open ? "▾" : "▸" }}
       </n-button>
-      <span>{{ node.label }}</span>
+      <span v-else class="tree-spacer" />
+      <n-icon
+        :component="KIND_ICON[node.kind] || LayersOutline"
+        :size="node.kind === 'field' ? 14 : 16"
+        class="tree-icon"
+      />
+      <span class="tree-name">{{ node.name || node.label }}</span>
+      <n-tag
+        v-if="node.kind !== 'source' && node.kindLabel"
+        size="tiny"
+        :bordered="false"
+        class="tree-kind-tag"
+      >
+        {{ node.kindLabel }}
+      </n-tag>
+      <n-tag
+        v-if="node.kind === 'field' && node.type"
+        size="tiny"
+        :bordered="false"
+        class="type-tag"
+      >
+        {{ node.type }}
+      </n-tag>
       <n-tag v-if="node.patched" size="tiny" type="success" :bordered="false">已修</n-tag>
       <n-spin v-if="node.loading" :size="14" />
     </div>

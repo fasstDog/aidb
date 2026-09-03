@@ -28,7 +28,8 @@ export const state = reactive({
   versions: [],
   histView: "",
   treeMsg: "请选择数据源",
-  treeRoot: null,
+  treeNodes: [],
+  treeCursor: null,
   catalogQ: "",
   selectedNodeKey: "",
   focusField: "",
@@ -54,9 +55,12 @@ export function engineById(id) {
     aliases: fromGallery.aliases || [],
     form_schema: fromGallery.form_schema,
     labels: fromGallery.labels,
+    icon: fromGallery.icon || "",
     ui: fromGallery.ui || {
       visible: fromGallery.visible !== false,
       label: fromGallery.label || fromGallery.id,
+      icon: fromGallery.icon || "",
+      description: fromGallery.description || "",
     },
     label: fromGallery.label || fromGallery.id,
   };
@@ -124,7 +128,23 @@ export async function loadEngines() {
 
 export async function loadGallery() {
   const data = await api("/api/engines/gallery");
-  state.gallery = engineRows(data);
+  const rows = engineRows(data);
+  rows.sort((a, b) => {
+    const av = a.visible === false ? 1 : 0;
+    const bv = b.visible === false ? 1 : 0;
+    if (av !== bv) return av - bv;
+    return String(a.label || a.id).localeCompare(String(b.label || b.id), "zh");
+  });
+  state.gallery = rows;
+}
+
+export function engineIconPath(engineId) {
+  if (!engineId) return "";
+  const g = state.gallery.find((e) => e.id === engineId);
+  if (g && g.icon) return g.icon;
+  const e = state.engines.find((row) => row.id === engineId);
+  if (e && e.ui && e.ui.icon) return e.ui.icon;
+  return "";
 }
 
 export function rebuildForm(engineId, config) {
@@ -218,7 +238,8 @@ export async function pingConnection(id) {
 export function goHome() {
   state.view = "home";
   state.selectedId = null;
-  state.treeRoot = null;
+  state.treeNodes = [];
+  state.treeCursor = null;
   state.treeMsg = "请选择数据源";
   state.versions = [];
   state.histView = "";
@@ -333,7 +354,8 @@ function appendItems(parent, page) {
 }
 
 export async function loadCatalogRoot() {
-  state.treeRoot = null;
+  state.treeNodes = [];
+  state.treeCursor = null;
   if (!state.selectedId) {
     state.treeMsg = "请选择数据源";
     return;
@@ -346,36 +368,40 @@ export async function loadCatalogRoot() {
       limit: 50,
     });
     applyCatalogLabels(page.labels);
-    const conn = state.connections.find((c) => c.id === state.selectedId);
-    const root = {
-      key: "source",
-      kind: "source",
-      name: (conn && (conn.name || conn.id)) || "数据源",
-      kindLabel: "数据源",
-      label: (conn && (conn.name || conn.id)) || "数据源",
-      patched: !!(page.source_patched || page.patched),
-      open: true,
-      children: [],
-      loaded: true,
-      loading: false,
-      cursor: null,
-      expandable: true,
-    };
-    appendItems(root, page);
-    state.treeRoot = root;
-    state.treeMsg = "";
-    state.selectedNodeKey = "source";
+    // 已进入某一数据源详情，目录从 namespace 起，不再套一层 source
+    const items = page.items || [];
+    state.treeNodes = [];
+    for (const item of items) {
+      const node = itemToNode(item);
+      if (node) state.treeNodes.push(node);
+    }
+    state.treeCursor = page.next_cursor || null;
+    state.treeMsg = state.treeNodes.length ? "" : "暂无命名空间";
+    if (state.overlayKind === "source") {
+      state.selectedNodeKey = "source";
+    }
   } catch (err) {
     state.treeMsg = err.message || "加载失败";
   }
 }
 
+export async function loadMoreRoot() {
+  if (!state.treeCursor || !state.selectedId) return;
+  const page = await loadCatalog({
+    source_id: state.selectedId,
+    q: state.catalogQ || undefined,
+    cursor: state.treeCursor,
+    limit: 50,
+  });
+  for (const item of page.items || []) {
+    const node = itemToNode(item);
+    if (node) state.treeNodes.push(node);
+  }
+  state.treeCursor = page.next_cursor || null;
+}
+
 export async function expandNode(node) {
   if (!node || node.loading) return;
-  if (node.kind === "source") {
-    node.open = !node.open;
-    return;
-  }
   if (node.kind === "field") return;
   if (node.open) {
     node.open = false;
@@ -458,7 +484,6 @@ export async function loadMore(node) {
 export function isNodeActive(node) {
   if (!node) return false;
   if (state.selectedNodeKey) return node.key === state.selectedNodeKey;
-  if (node.kind === "source") return state.overlayKind === "source";
   if (node.kind === "collection") {
     return (
       state.overlayKind === "collection" &&
@@ -469,18 +494,24 @@ export function isNodeActive(node) {
   return false;
 }
 
+export function isSourceOverlayActive() {
+  return state.overlayKind === "source" && state.selectedNodeKey === "source";
+}
+
+export async function activateSourceOverlay() {
+  state.selectedNodeKey = "source";
+  state.focusField = "";
+  state.overlayKind = "source";
+  state.overlayNs = null;
+  state.overlayColl = null;
+  await loadSourceOverlay();
+  await loadHistory();
+}
+
 export async function activateNode(node) {
   if (!node) return;
   state.selectedNodeKey = node.key;
   state.focusField = node.kind === "field" ? node.name : "";
-  if (node.kind === "source") {
-    state.overlayKind = "source";
-    state.overlayNs = null;
-    state.overlayColl = null;
-    await loadSourceOverlay();
-    await loadHistory();
-    return;
-  }
   if (node.kind === "namespace") {
     if (!node.open && !node.loaded) {
       node.open = true;

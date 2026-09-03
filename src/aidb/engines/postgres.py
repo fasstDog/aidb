@@ -22,7 +22,7 @@ class PostgresAdapter(EngineAdapter):
         visible=True,
         label="PostgreSQL",
         icon="engines/postgres.svg",
-        description="开源对象-关系型数据库 / Open-source object-relational database",
+        description="开源对象-关系型数据库，生态成熟、扩展性强",
     )
     labels = EngineLabels(namespace="schema", collection="表", field="列")
     form_schema = FormSchema(
@@ -225,8 +225,9 @@ class PostgresAdapter(EngineAdapter):
             raise AidbError(NOT_READONLY, "语句不是只读查询", {"engine": self.id})
         cap = max(0, int(max_rows))
         try:
+            # SET 不支持绑定参数（psycopg 会变成 $1，Postgres 报 syntax error）
             ms = max(1, int(float(timeout_s) * 1000))
-            handle.execute("SET statement_timeout = %s", (ms,))
+            handle.execute(f"SET statement_timeout = {ms}")
             cur = handle.execute(sql)
             columns = [d.name for d in cur.description] if cur.description else []
             fetched = cur.fetchmany(cap + 1) if cap else []

@@ -1,0 +1,18 @@
+{
+  "postgres": "https://cdn.simpleicons.org/postgresql",
+  "mysql": "https://cdn.simpleicons.org/mysql",
+  "mongodb": "https://cdn.simpleicons.org/mongodb",
+  "redis": "https://cdn.simpleicons.org/redis",
+  "neo4j": "https://cdn.simpleicons.org/neo4j",
+  "sqlite": "https://cdn.simpleicons.org/sqlite",
+  "clickhouse": "https://cdn.simpleicons.org/clickhouse",
+  "duckdb": "https://cdn.simpleicons.org/duckdb",
+  "oracle": "https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/oracle.svg",
+  "hive": "https://cdn.simpleicons.org/apachehive",
+  "mssql": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/microsoftsqlserver.svg",
+  "doris": "https://www.apache.org/logos/originals/doris.svg",
+  "starrocks": "https://avatars.githubusercontent.com/u/8824706?s=200&v=4 (embedded image/png)",
+  "oceanbase": "https://mdn.alipayobjects.com/huamei_22khvb/afts/img/A*xH7yQbaaFXoAAAAAAAAAAAAADiGDAQ/original (embedded image/png)",
+  "gaussdb": "https://res-static.hc-cdn.cn/cloudbu-site/intl/en-us/gaussdbforopengauss/product_gaussdb_package_icon2.png (embedded image/png)",
+  "dameng": "https://avatars.githubusercontent.com/u/50880271?s=200&v=4 (embedded image/jpeg)"
+}

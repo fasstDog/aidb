@@ -111,15 +111,26 @@ async function confirmName() {
                 <n-input v-model:value="state.collectionOverlay.description" type="textarea" :rows="3" />
               </n-form-item>
               <n-form-item :label="(state.labels.field || '字段') + '说明'">
-                <div
-                  v-for="row in fieldEntries"
-                  :key="row.name"
-                  class="field-row"
-                  :class="{ focus: state.focusField === row.name }"
-                >
-                  <span class="field-name">{{ row.name }}</span>
-                  <n-tag v-if="row.type" size="tiny" type="info" :bordered="false">{{ row.type }}</n-tag>
-                  <n-input v-model:value="state.collectionOverlay.fields[row.name]" size="small" />
+                <div class="field-list">
+                  <div
+                    v-for="row in fieldEntries"
+                    :key="row.name"
+                    class="field-row"
+                    :class="{ focus: state.focusField === row.name }"
+                  >
+                    <div class="field-head">
+                      <span class="field-name" :title="row.name">{{ row.name }}</span>
+                      <n-tag v-if="row.type" size="tiny" type="info" :bordered="false">{{ row.type }}</n-tag>
+                    </div>
+                    <n-input
+                      v-model:value="state.collectionOverlay.fields[row.name]"
+                      size="small"
+                      type="textarea"
+                      :autosize="{ minRows: 1, maxRows: 4 }"
+                      :placeholder="'说明「' + row.name + '」'"
+                    />
+                  </div>
+                  <p v-if="!fieldEntries.length" class="muted">展开表后可编辑字段说明</p>
                 </div>
               </n-form-item>
             </template>

@@ -19,13 +19,29 @@ class TestEngineRegistration(unittest.TestCase):
         self.assertEqual(set(ids), {"postgres", "mysql"})
         self.assertNotIn("dameng", ids)
 
-    def test_all_engines_includes_hidden_dameng(self) -> None:
+    def test_all_engines_includes_hidden_placeholders(self) -> None:
         ids = [a.id for a in all_engines()]
         self.assertIn("postgres", ids)
         self.assertIn("mysql", ids)
-        self.assertIn("dameng", ids)
-        self.assertNotIn("mongodb", ids)
-        self.assertNotIn("redis", ids)
+        # CONTRACT 必含占位（画廊墙），不可选
+        for engine_id in (
+            "dameng",
+            "oracle",
+            "sqlite",
+            "clickhouse",
+            "doris",
+            "duckdb",
+            "gaussdb",
+            "hive",
+            "mssql",
+            "oceanbase",
+            "starrocks",
+            "mongodb",
+            "redis",
+            "neo4j",
+        ):
+            self.assertIn(engine_id, ids)
+            self.assertFalse(get(engine_id).ui.visible)
         self.assertNotIn("elasticsearch", ids)
 
     def test_aliases(self) -> None:
@@ -126,6 +142,40 @@ class TestReadonly(unittest.TestCase):
                 None, "DELETE FROM t", timeout_s=1, max_rows=10
             )
         self.assertEqual(ctx.exception.code, NOT_READONLY)
+
+    def test_pg_statement_timeout_uses_literal_not_bind(self) -> None:
+        """Postgres SET 不接受 $1；超时必须写成整字面量。"""
+
+        class Col:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+        class FakeCursor:
+            description = (Col("n"),)
+
+            def fetchmany(self, size):
+                return [(1,)]
+
+        class FakeConn:
+            def __init__(self) -> None:
+                self.calls: list[tuple] = []
+
+            def execute(self, sql, params=None):
+                self.calls.append((sql, params))
+                if str(sql).startswith("SET "):
+                    return self
+                return FakeCursor()
+
+        conn = FakeConn()
+        result = self.pg.execute_readonly(
+            conn, "SELECT 1 AS n", timeout_s=2.5, max_rows=10
+        )
+        self.assertEqual(result.rows, [[1]])
+        self.assertEqual(len(conn.calls), 2)
+        set_sql, set_params = conn.calls[0]
+        self.assertEqual(set_sql, "SET statement_timeout = 2500")
+        self.assertIsNone(set_params)
+        self.assertEqual(conn.calls[1], ("SELECT 1 AS n", None))
 
 
 class TestQueryResultShape(unittest.TestCase):

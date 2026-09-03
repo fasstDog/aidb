@@ -14,7 +14,7 @@ register(
         visible=False,
         label="达梦",
         icon="engines/dameng.svg",
-        description="达梦数据库占位 / Dameng placeholder",
+        description="国产关系型数据库，兼容 Oracle 生态",
         labels=EngineLabels(namespace="schema", collection="表", field="列"),
         form_schema=FormSchema(
             fields=[

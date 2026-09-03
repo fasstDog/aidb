@@ -21,10 +21,28 @@ const message = useMessage();
 const currentEngine = computed(() => engineById(state.connForm.engine));
 const fields = computed(() => schemaFields(currentEngine.value));
 const title = computed(() => (state.drawerMode === "edit" ? "编辑数据源" : "新增数据源"));
+const isGallery = computed(
+  () => state.drawerMode === "create" && state.drawerStep === "gallery"
+);
+const drawerWidth = computed(() => (isGallery.value ? 760 : 520));
+
+const gallerySorted = computed(() => {
+  const rows = Array.isArray(state.gallery) ? state.gallery.slice() : [];
+  rows.sort((a, b) => {
+    const av = a.visible === false ? 1 : 0;
+    const bv = b.visible === false ? 1 : 0;
+    if (av !== bv) return av - bv;
+    return String(a.label || a.id).localeCompare(String(b.label || b.id), "zh");
+  });
+  return rows;
+});
+
+const enabledCount = computed(() => gallerySorted.value.filter((e) => e.visible !== false).length);
+const soonCount = computed(() => gallerySorted.value.length - enabledCount.value);
 
 function onSelectEngine(item) {
   if (!item || item.visible === false) {
-    message.info("该引擎尚未启用");
+    message.info("该引擎即将支持，当前版本尚未启用");
     return;
   }
   pickGalleryEngine(item);
@@ -90,38 +108,44 @@ async function onPing() {
 </script>
 
 <template>
-  <n-drawer v-model:show="state.drawerShow" :width="560" :trap-focus="false">
-    <n-drawer-content :title="title" closable>
-      <div v-if="state.drawerMode === 'create' && state.drawerStep === 'gallery'">
-        <p class="muted" style="margin: 0 0 16px">从注册表选择引擎。未启用的显示为即将支持。</p>
-        <n-grid :cols="2" :x-gap="12" :y-gap="12" responsive="screen">
-          <n-grid-item v-for="item in state.gallery" :key="item.id">
-            <n-card
-              hoverable
-              class="gallery-card"
-              :class="{ disabled: item.visible === false }"
-              @click="onSelectEngine(item)"
-            >
-              <n-tag
-                v-if="item.visible === false"
-                class="gallery-soon"
-                size="small"
-                type="warning"
-                :bordered="false"
-              >
-                即将支持
-              </n-tag>
-              <div class="gallery-body">
-                <EngineIcon :family="item.family" :engine="item.id" :size="22" />
-                <div>
-                  <div class="gallery-title">{{ item.label || item.id }}</div>
-                  <div class="muted">{{ item.family }}</div>
-                </div>
-              </div>
-            </n-card>
-          </n-grid-item>
-        </n-grid>
-        <n-empty v-if="!state.gallery.length" description="引擎画廊为空" />
+  <n-drawer v-model:show="state.drawerShow" :width="drawerWidth" :trap-focus="false">
+    <n-drawer-content :title="title" closable :body-content-style="isGallery ? { paddingTop: '12px' } : undefined">
+      <div v-if="isGallery" class="engine-wall">
+        <div class="engine-wall-head">
+          <div>
+            <div class="engine-wall-title">选择数据库引擎</div>
+            <p class="muted engine-wall-sub">
+              已启用 {{ enabledCount }} 种，另有 {{ soonCount }} 种即将支持。
+            </p>
+          </div>
+        </div>
+        <div class="engine-wall-grid">
+          <button
+            v-for="item in gallerySorted"
+            :key="item.id"
+            type="button"
+            class="engine-tile"
+            :class="{ disabled: item.visible === false }"
+            :title="item.visible === false ? '即将支持' : item.label || item.id"
+            @click="onSelectEngine(item)"
+          >
+            <span v-if="item.visible === false" class="engine-tile-soon">即将支持</span>
+            <EngineIcon
+              class="engine-tile-logo"
+              :family="item.family"
+              :engine="item.id"
+              :icon="item.icon"
+              :size="40"
+              :muted="item.visible === false"
+              round
+            />
+            <div class="engine-tile-name">{{ item.label || item.id }}</div>
+            <div class="engine-tile-desc">
+              {{ item.description || item.family || item.id }}
+            </div>
+          </button>
+        </div>
+        <n-empty v-if="!gallerySorted.length" description="引擎画廊为空" />
       </div>
       <div v-else>
         <n-space v-if="state.drawerMode === 'create'" style="margin-bottom: 12px">
@@ -129,7 +153,15 @@ async function onPing() {
         </n-space>
         <n-form label-placement="top" size="medium">
           <n-form-item label="引擎">
-            <n-input :value="engineLabel(state.connForm.engine)" disabled />
+            <n-space align="center">
+              <EngineIcon
+                :family="currentEngine && currentEngine.family"
+                :engine="state.connForm.engine"
+                :icon="currentEngine && ((currentEngine.ui && currentEngine.ui.icon) || currentEngine.icon)"
+                :size="22"
+              />
+              <n-input :value="engineLabel(state.connForm.engine)" disabled style="min-width: 200px" />
+            </n-space>
           </n-form-item>
           <n-form-item label="名称" required>
             <n-input v-model:value="state.connForm.name" placeholder="订单库" />

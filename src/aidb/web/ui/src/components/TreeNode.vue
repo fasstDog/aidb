@@ -4,7 +4,6 @@ import {
   FolderOutline,
   GridOutline,
   LayersOutline,
-  ServerOutline,
 } from "@vicons/ionicons5";
 import {
   expandNode,
@@ -18,7 +17,6 @@ defineProps({
 });
 
 const KIND_ICON = {
-  source: ServerOutline,
   namespace: FolderOutline,
   collection: GridOutline,
   field: CubeOutline,
@@ -36,6 +34,7 @@ const KIND_ICON = {
         v-if="node.expandable"
         text
         size="tiny"
+        class="tree-toggle"
         @click.stop="expandNode(node)"
       >
         {{ node.open ? "▾" : "▸" }}
@@ -46,28 +45,37 @@ const KIND_ICON = {
         :size="node.kind === 'field' ? 14 : 16"
         class="tree-icon"
       />
-      <span class="tree-name">{{ node.name || node.label }}</span>
-      <n-tag
-        v-if="node.kind !== 'source' && node.kindLabel"
-        size="tiny"
-        :bordered="false"
-        class="tree-kind-tag"
-      >
-        {{ node.kindLabel }}
-      </n-tag>
-      <n-tag
-        v-if="node.kind === 'field' && node.type"
-        size="tiny"
-        :bordered="false"
-        class="type-tag"
-      >
-        {{ node.type }}
-      </n-tag>
-      <n-tag v-if="node.patched" size="tiny" type="success" :bordered="false">已修</n-tag>
-      <n-spin v-if="node.loading" :size="14" />
+      <span class="tree-name" :title="node.name || node.label">{{ node.name || node.label }}</span>
+      <div class="tree-meta">
+        <n-tag
+          v-if="node.kindLabel"
+          size="tiny"
+          :bordered="false"
+          class="tree-kind-tag"
+        >
+          {{ node.kindLabel }}
+        </n-tag>
+        <n-tag
+          v-if="node.kind === 'field' && node.type"
+          size="tiny"
+          :bordered="false"
+          class="type-tag"
+          :title="node.type"
+        >
+          {{ node.type }}
+        </n-tag>
+        <n-tag v-if="node.patched" size="tiny" type="success" :bordered="false">已修</n-tag>
+        <n-spin v-if="node.loading" :size="14" />
+      </div>
     </div>
     <div v-if="node.open" class="tree-children">
       <TreeNode v-for="child in node.children" :key="child.key" :node="child" />
+      <p
+        v-if="node.loaded && !node.loading && !node.children.length && !node.cursor"
+        class="muted tree-empty"
+      >
+        暂无{{ node.kind === "namespace" ? "表" : "字段" }}
+      </p>
       <n-button
         v-if="node.cursor"
         size="tiny"

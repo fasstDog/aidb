@@ -14,6 +14,7 @@ import {
   pingOf,
   refreshConnections,
   goHome,
+  engineIconPath,
 } from "../store";
 import EngineIcon from "./EngineIcon.vue";
 
@@ -99,7 +100,12 @@ function onDelete(ev, conn) {
           已修
         </n-tag>
         <div class="conn-card-body">
-          <EngineIcon :family="conn.family" :engine="conn.engine" :size="26" />
+          <EngineIcon
+            :family="conn.family"
+            :engine="conn.engine"
+            :icon="engineIconPath(conn.engine)"
+            :size="26"
+          />
           <div class="conn-card-main">
             <div class="conn-card-title">{{ conn.name || conn.id }}</div>
             <div class="conn-card-engine">{{ engineLabel(conn.engine) }}</div>

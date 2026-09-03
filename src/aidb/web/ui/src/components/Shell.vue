@@ -16,6 +16,9 @@ import {
   pingOf,
   engineLabel,
   connectionSummary,
+  activateSourceOverlay,
+  isSourceOverlayActive,
+  engineIconPath,
 } from "../store";
 import ConnectionGrid from "./ConnectionGrid.vue";
 import ConnectionDrawer from "./ConnectionDrawer.vue";
@@ -30,9 +33,35 @@ const bundleShow = ref(false);
 const bootError = ref("");
 const pinging = ref(false);
 
+const SPLIT_KEY = "aidb.catalogSplitPx";
+const splitSize = ref(readSplitSize());
+
 const selected = computed(() =>
   state.connections.find((c) => c.id === state.selectedId) || null
 );
+
+function readSplitSize() {
+  try {
+    const n = Number(localStorage.getItem(SPLIT_KEY));
+    if (Number.isFinite(n) && n >= 220 && n <= 640) return `${Math.round(n)}px`;
+  } catch {
+    /* ignore */
+  }
+  return "320px";
+}
+
+function onSplitUpdate(v) {
+  // NSplit: number = 0–1 比例；string（如 "320px"）= 固定像素
+  splitSize.value = v;
+  try {
+    const px = typeof v === "string" ? Number.parseFloat(v) : Math.round(Number(v) * (window.innerWidth || 1));
+    if (Number.isFinite(px) && px >= 220 && px <= 640) {
+      localStorage.setItem(SPLIT_KEY, String(Math.round(px)));
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 onMounted(async () => {
   try {
@@ -87,8 +116,8 @@ function onDelete() {
 </script>
 
 <template>
-  <n-layout style="height: 100vh">
-    <n-layout-header bordered>
+  <div class="app-shell">
+    <header class="app-header-bar">
       <div class="app-header">
         <div>
           <h1>AIDB 配置台<span class="sub">连接 · 目录补丁 · 导入导出</span></h1>
@@ -102,17 +131,15 @@ function onDelete() {
           <n-switch :value="state.dark" @update:value="setDark" size="small" />
         </n-space>
       </div>
-    </n-layout-header>
-    <n-alert v-if="bootError" type="error" style="margin: 8px 12px">{{ bootError }}</n-alert>
-    <n-layout-content
-      v-if="state.view === 'home'"
-      :native-scrollbar="false"
-      content-style="padding: 24px; height: calc(100vh - 52px); overflow: auto;"
-    >
-      <ConnectionGrid />
-    </n-layout-content>
-    <n-layout v-else has-sider style="height: calc(100vh - 52px)">
-      <n-layout-content :native-scrollbar="false" content-style="height: 100%; display: flex; flex-direction: column;">
+    </header>
+    <n-alert v-if="bootError" type="error" class="boot-alert">{{ bootError }}</n-alert>
+    <main class="app-main">
+      <n-scrollbar v-if="state.view === 'home'" class="home-scroll">
+        <div style="padding: 24px">
+          <ConnectionGrid />
+        </div>
+      </n-scrollbar>
+      <div v-else class="detail-page">
         <div class="detail-bar">
           <n-button size="small" quaternary @click="goHome">
             <template #icon><n-icon :component="ArrowBackOutline" /></template>
@@ -122,9 +149,15 @@ function onDelete() {
             v-if="selected"
             :family="selected.family"
             :engine="selected.engine"
+            :icon="engineIconPath(selected.engine)"
             :size="18"
           />
-          <div class="detail-meta">
+          <div
+            class="detail-meta detail-meta-click"
+            :class="{ active: isSourceOverlayActive() }"
+            title="编辑数据源说明与查询规则"
+            @click="activateSourceOverlay"
+          >
             <div class="detail-name">{{ selected ? (selected.name || selected.id) : "" }}</div>
             <div class="muted">
               {{ selected ? engineLabel(selected.engine) : "" }}
@@ -144,25 +177,40 @@ function onDelete() {
             <n-button size="small" tertiary type="error" @click="onDelete">删除</n-button>
           </n-space>
         </div>
-        <n-layout has-sider style="flex: 1; min-height: 0">
-          <n-layout-sider
-            :width="320"
-            :native-scrollbar="false"
-            bordered
-            content-style="padding: 16px; height: 100%; overflow: auto;"
+        <div class="detail-split">
+          <n-split
+            direction="horizontal"
+            :size="splitSize"
+            default-size="320px"
+            min="220px"
+            max="640px"
+            :resize-trigger-size="6"
+            class="detail-split-inner"
+            @update:size="onSplitUpdate"
           >
-            <CatalogPane />
-          </n-layout-sider>
-          <n-layout-content
-            :native-scrollbar="false"
-            content-style="padding: 16px 24px; height: 100%; overflow: auto;"
-          >
-            <EditorPane />
-          </n-layout-content>
-        </n-layout>
-      </n-layout-content>
-    </n-layout>
+            <template #1>
+              <div class="split-pane split-pane-left">
+                <n-scrollbar class="split-scroll">
+                  <div class="split-pane-inner">
+                    <CatalogPane />
+                  </div>
+                </n-scrollbar>
+              </div>
+            </template>
+            <template #2>
+              <div class="split-pane split-pane-right">
+                <n-scrollbar class="split-scroll">
+                  <div class="split-pane-inner split-pane-inner-right">
+                    <EditorPane />
+                  </div>
+                </n-scrollbar>
+              </div>
+            </template>
+          </n-split>
+        </div>
+      </div>
+    </main>
     <ConnectionDrawer />
     <BundleModal v-model:show="bundleShow" />
-  </n-layout>
+  </div>
 </template>

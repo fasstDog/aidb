@@ -30,7 +30,7 @@ def load_engines() -> None:
     pkg_dir = Path(__file__).resolve().parent
     for path in sorted(pkg_dir.glob("*.py")):
         modname = path.stem
-        if modname in _SKIP_MODULES:
+        if modname in _SKIP_MODULES or modname.startswith("_"):
             continue
         importlib.import_module(f"{__package__}.{modname}")
 

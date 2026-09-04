@@ -27,3 +27,6 @@ mongo = ["pymongo"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"aidb.web" = ["static/**/*"]

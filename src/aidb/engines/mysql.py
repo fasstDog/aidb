@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from aidb.engines._host import resolve_host, rewrite_loopback_config
 from aidb.engines._readonly import engine_error, is_readonly_sql, jsonable_cell
 from aidb.engines.base import EngineAdapter, EngineLabels, FormField, FormSchema, UiMeta
 from aidb.engines.registry import register
@@ -40,12 +41,13 @@ class MysqlAdapter(EngineAdapter):
     )
 
     def _connect_kwargs(self, config: Mapping[str, Any]) -> dict[str, Any]:
+        config = rewrite_loopback_config(config)
         dsn = config.get("dsn")
         if dsn and "://" in str(dsn):
             parsed = urlparse(str(dsn))
             database = unquote(parsed.path.lstrip("/"))
             return {
-                "host": parsed.hostname or "127.0.0.1",
+                "host": resolve_host(parsed.hostname),
                 "port": parsed.port or 3306,
                 "user": unquote(parsed.username or ""),
                 "password": unquote(parsed.password or ""),
@@ -60,7 +62,7 @@ class MysqlAdapter(EngineAdapter):
                 {"engine": self.id, "field": "database"},
             )
         return {
-            "host": config.get("host", "127.0.0.1"),
+            "host": resolve_host(config.get("host")),
             "port": int(config.get("port", 3306)),
             "user": config.get("user"),
             "password": config.get("password") or "",

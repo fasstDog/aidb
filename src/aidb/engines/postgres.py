@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from aidb.engines._host import resolve_host, rewrite_loopback_config
 from aidb.engines._readonly import engine_error, is_readonly_sql, jsonable_cell
 from aidb.engines.base import EngineAdapter, EngineLabels, FormField, FormSchema, UiMeta
 from aidb.engines.registry import register
@@ -42,6 +43,7 @@ class PostgresAdapter(EngineAdapter):
         except ImportError as exc:
             raise AidbError("engine_error", "缺少 psycopg 驱动", {"engine": self.id}) from exc
         try:
+            config = rewrite_loopback_config(config)
             dsn = config.get("dsn")
             if dsn:
                 conn = psycopg.connect(str(dsn), autocommit=True)
@@ -54,7 +56,7 @@ class PostgresAdapter(EngineAdapter):
                         {"engine": self.id, "field": "dbname"},
                     )
                 kwargs: dict[str, Any] = {
-                    "host": config.get("host", "127.0.0.1"),
+                    "host": resolve_host(config.get("host")),
                     "port": int(config.get("port", 5432)),
                     "dbname": dbname,
                     "user": config.get("user"),
